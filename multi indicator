@@ -1,4 +1,4 @@
-//@version=2
+//@version=4
 study(title="Multi Indicators ", shorttitle="Multi Indicators [ValiantHero]", overlay=true, max_labels_count=500)
 
 //INPUTS
@@ -136,3 +136,4 @@ lb = iff( x2 >= 0, src + x2, src + x2 * (100-osLevel)/osLevel )
 plot(rsiBands? ub:na, title="Resistance", color=color.red, linewidth=2)
 plot(rsiBands? lb:na, title="Support", color=color.green, linewidth=2)
 plot(rsiBands? avg(ub, lb):na, title="RSI Midline", color=color.gray, linewidth=1)
+
