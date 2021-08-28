@@ -1,0 +1,138 @@
+//@version=4
+study(title="Multi Indicators ", shorttitle="Multi Indicators [ValiantHero]", overlay=true, max_labels_count=500)
+
+//INPUTS
+gr0="Indicators"
+pivotHilo = input(true, title="Pivot HILO", inline="Pivot Hilo", group=gr0)
+rsiBands = input(true, title="RSI Bands", inline="RSI Bands", group=gr0)
+emaLevels = input(true, title="EMA Levels", inline="EMA Levels", group=gr0)
+
+gr1="Pivot HILO: Source / Length Left / Length Right"
+srcH = input(high, title="Pivot High", inline="Pivot High", group=gr1)
+leftLenH = input(title="", type=input.integer, defval=5, minval=1, inline="Pivot High",group=gr1)
+rightLenH = input(title="/", type=input.integer, defval=5, minval=1, inline="Pivot High",group=gr1)
+colorH = input(title="", defval=color.new(color.green,50), inline="Pivot High",group=gr1)
+
+srcL = input(low, title="Pivot Low ", inline="Pivot Low", group=gr1)
+leftLenL = input(title="", type=input.integer, defval=5, minval=1, inline="Pivot Low", group=gr1)
+rightLenL = input(title="/", type=input.integer, defval=5, minval=1, inline="Pivot Low",group=gr1)
+colorL = input(title="", defval=color.new(color.red,50), inline="Pivot Low",group=gr1)
+
+
+gr2="Pivot HILO: Options"
+ShowHHLLInput = input(true, title="Mostra etichetta HH, LL, LH, HL sulle candele",group=gr2)
+ShowPriceInput = input(false, title="Mostra prezzo HH, LL, LH, HL  sulle candele",group=gr2)
+ShowSRLevelsInput = input(true, title="Mostra estensioni dei supporti/resistenze",group=gr2)
+maxLvlLen = input(0, minval=0, title="Massima lunghezza di estensione del livello supporti/resistenze (0 = massimo)",group=gr2)
+ShowChannelInput = input(false, title="Show Levels as a Fractal Chaos Channel",group=gr2)
+ShowFBInput = input(true, title="Show fractal Break out/down symbols",group=gr2)
+
+ShowHHLL = ShowHHLLInput and pivotHilo
+ShowPrice = ShowPriceInput and pivotHilo
+ShowSRLevels = ShowSRLevelsInput and pivotHilo
+ShowChannel = ShowChannelInput and pivotHilo
+ShowFB = ShowFBInput and pivotHilo
+
+// Get High and Low Pivot Points
+ph = pivothigh(srcH, leftLenH, rightLenH)
+pl = pivotlow(srcL, leftLenL, rightLenL)
+
+// Higher Highs, Lower Highs, Higher Lows, Lower Lows 
+valuewhen_1 = valuewhen(ph, srcH[rightLenH], 1)
+valuewhen_2 = valuewhen(ph, srcH[rightLenH], 0)
+higherhigh = na(ph) ? na : valuewhen_1 < valuewhen_2 ? ph : na
+valuewhen_3 = valuewhen(ph, srcH[rightLenH], 1)
+valuewhen_4 = valuewhen(ph, srcH[rightLenH], 0)
+lowerhigh = na(ph) ? na : valuewhen_3 > valuewhen_4 ? ph : na
+valuewhen_5 = valuewhen(pl, srcL[rightLenL], 1)
+valuewhen_6 = valuewhen(pl, srcL[rightLenL ], 0)
+higherlow = na(pl) ? na : valuewhen_5 < valuewhen_6 ? pl : na
+valuewhen_7 = valuewhen(pl, srcL[rightLenL], 1)
+valuewhen_8 = valuewhen(pl, srcL[rightLenL ], 0)
+lowerlow = na(pl) ? na : valuewhen_7 > valuewhen_8 ? pl : na
+
+
+drawLabel(_offset, _pivot, _style, _yloc, _color, _text) =>
+    if not na(_pivot)
+        label.new(bar_index[_offset], _pivot, text = _text+tostring(_pivot, format.mintick)+"]", style=_style, yloc=_yloc, color=_color, textcolor=_color)
+
+drawLabel(rightLenH, ShowPrice ? higherhigh : na, label.style_none, yloc.abovebar, colorH, "[")
+drawLabel(rightLenH, ShowPrice ? higherlow : na, label.style_none, yloc.belowbar, colorL, "[")
+drawLabel(rightLenH, ShowPrice ? lowerhigh : na, label.style_none, yloc.abovebar, colorH, "[")
+drawLabel(rightLenH, ShowPrice ? lowerlow : na, label.style_none, yloc.belowbar, colorL, "[")
+
+plotshape(ShowHHLL ? higherhigh : na, title='HH', style=shape.triangledown, location=location.abovebar, color=colorH, text="HH", textcolor=colorH, offset=-rightLenH)
+plotshape(ShowHHLL ? higherlow : na, title='HL', style=shape.triangleup, location=location.belowbar, color=colorL, text="HL", textcolor=colorL, offset=-rightLenH)
+plotshape(ShowHHLL ? lowerhigh : na, title='LH', style=shape.triangledown, location=location.abovebar, color=colorH, text="LH", textcolor=colorH, offset=-rightLenL)
+plotshape(ShowHHLL ? lowerlow : na, title='LL', style=shape.triangleup, location=location.belowbar, color=colorL, text="LL", textcolor=colorL, offset=-rightLenL)
+
+
+//Count How many candles for current Pivot Level, If new reset.
+countH = 0
+countL = 0
+countH := na(ph) ? nz(countH[1]) + 1 : 0
+countL := na(pl) ? nz(countL[1]) + 1 : 0
+
+pvtH = 0.0
+pvtL = 0.0
+pvtH := na(ph) ? pvtH[1] : srcH[rightLenH]
+pvtL := na(pl) ? pvtL[1] : srcL[rightLenL]
+
+HpC = pvtH != pvtH[1] ? na : colorH
+LpC = pvtL != pvtL[1] ? na : colorL
+
+// Show Levels if Selected
+plot(ShowSRLevels and not ShowChannel and (maxLvlLen == 0 or countH < maxLvlLen) ? pvtH : na, color=HpC, offset=-rightLenH , title="Top Levels HH,LH",style=plot.style_circles)
+plot(ShowSRLevels and not ShowChannel and (maxLvlLen == 0 or countL < maxLvlLen) ? pvtL : na, color=LpC, offset=-rightLenL , title="Bottom Levels LL,HL",style=plot.style_circles)
+
+// Show Levels as a Fractal Chaos Channel
+plot(ShowSRLevels and ShowChannel ? pvtH : na, color=colorH, style=plot.style_stepline, title="Top Chaos Channel",offset=-rightLenH)
+plot(ShowSRLevels and ShowChannel ? pvtL : na, color=colorL, style=plot.style_stepline, title="Bottom Chaos Channel", offset=-rightLenL)
+
+// // Add Optional Fractal Break Alerts
+buy = true
+sell = true
+buy  := close>pvtH and open<=pvtH 
+sell := close<pvtL and open>=pvtL 
+
+plotshape(ShowFB and buy?1:na, title="Breakout Bar", text="↑", style=shape.circle, location =location.belowbar, color=colorH, textcolor=colorH, size=size.auto, editable=true)
+plotshape(ShowFB and sell?-1:na, title="Breakdown Bar",text="↓", style=shape.circle,location=location.abovebar, color=colorL, textcolor=colorL, size=size.auto, editable=true)
+
+// Alerts
+alertcondition(buy or sell,title="Fractal Break Arrow",message="Alert")
+alertcondition(buy,title="Fractal Break Long",message="Long")
+alertcondition(sell,title="Fractal Break Short",message="Short")
+
+gr3="EMA levels"
+shortestLevel = input(12, title="Shortest",group=gr3)
+shortLevel = input(26, title="Short",group=gr3)
+longerLevel = input(100, title="Longer",group=gr3)
+longestLevel = input(200, title="Longest",group=gr3)
+
+shortest = ema(close, shortestLevel)
+short = ema(close, shortLevel)
+longer = ema(close, longerLevel)
+longest = ema(close, longestLevel)
+
+plot(emaLevels?shortest:na, color = color.red)
+plot(emaLevels?short:na, color = color.orange)
+plot(emaLevels?longer:na, color = color.aqua)
+plot(emaLevels?longest:na, color = color.white)
+
+// RSI BANDS
+gr4="RSI Bands"
+obLevel = input(70, title="RSI Overbought",group=gr4)
+osLevel = input(30, title="RSI Oversold",group=gr4)
+length = input(14, title="RSI Length",group=gr4)
+src=close
+ep = 2 * length - 1
+auc = ema( max( src - src[1], 0 ), ep )
+adc = ema( max( src[1] - src, 0 ), ep )
+x1 = (length - 1) * ( adc * obLevel / (100-obLevel) - auc)
+ub = iff( x1 >= 0, src + x1, src + x1 * (100-obLevel)/obLevel )
+x2 = (length - 1) * ( adc * osLevel / (100-osLevel) - auc)
+lb = iff( x2 >= 0, src + x2, src + x2 * (100-osLevel)/osLevel )
+
+plot(rsiBands? ub:na, title="Resistance", color=color.red, linewidth=2)
+plot(rsiBands? lb:na, title="Support", color=color.green, linewidth=2)
+plot(rsiBands? avg(ub, lb):na, title="RSI Midline", color=color.gray, linewidth=1)
