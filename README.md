@@ -1,0 +1,2 @@
+# pinescript
+esempi di pinescript
