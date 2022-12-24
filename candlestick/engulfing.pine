@@ -1,0 +1,20 @@
+//@version=4
+study(title="Lesson 5", shorttitle="RSI Signal", overlay=true)
+
+// Get user input
+rsiSource = input(title="RSI Source", type=input.source, defval=close)
+rsiLength = input(title="RSI Length", type=input.integer, defval=14)
+rsiOverbought = input(title="RSI Overbought Level", type=input.integer, defval=70)
+rsiOversold = input(title="RSI Oversold Level", type=input.integer, defval=30)
+
+// Get RSI value
+rsiValue = rsi(rsiSource, rsiLength)
+rsiOB = rsiValue >= rsiOverbought
+rsiOS = rsiValue <= rsiOversold
+
+// Plot signals to chart
+plotshape(rsiOB, title="Overbought", location=location.abovebar, color=color.red, transp=0, style=shape.triangledown, text="OB")
+plotshape(rsiOS, title="Oversold", location=location.belowbar, color=color.green, transp=0, style=shape.triangleup, text="OS")
+
+// Send out an alert if this candle meets our conditions
+alertcondition(rsiOB or rsiOS, title="RSI Alert!", message="RSI signal for XXX")
