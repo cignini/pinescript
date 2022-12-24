@@ -1,0 +1,134 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//
+// ██╗░░░██╗░█████╗░██╗░░░░░██╗░█████╗░███╗░░██╗████████╗ ██╗░░██╗███████╗██████╗░░█████╗░
+// ██║░░░██║██╔══██╗██║░░░░░██║██╔══██╗████╗░██║╚══██╔══╝ ██║░░██║██╔════╝██╔══██╗██╔══██╗
+// ╚██╗░██╔╝███████║██║░░░░░██║███████║██╔██╗██║░░░██║░░░░███████║█████╗░░██████╔╝██║░░██║
+// ░╚████╔╝░██╔══██║██║░░░░░██║██╔══██║██║╚████║░░░██║░░░░██╔══██║██╔══╝░░██╔══██╗██║░░██║
+// ░░╚██╔╝░░██║░░██║███████╗██║██║░░██║██║░╚███║░░░██║░░░░██║░░██║███████╗██║░░██║╚█████╔╝
+// ░░░╚═╝░░░╚═╝░░╚═╝╚══════╝╚═╝╚═╝░░╚═╝╚═╝░░╚══╝░░░╚═╝░░░░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝░╚════╝░
+
+// QUICK REFERENCE
+
+// Centered moving averages tries to resolve the problem that simple moving average are still not able to handle significant trends when forecasting
+// When computing a running moving average in a centered way, placing the average in the middle time period makes sense
+// If we average an even number of terms, we need to smooth the smoothed values
+// Try to describe it with an example:
+// The following table shows the results using a centered moving average of 4.
+// 
+// nterim   Steps
+// Period	Value	SMA	    Centered
+// 1	    9	 	 
+// 1.5	 	 	 
+// 2	    8	 	 
+// 2.5	 	        9.5	 
+// 3	    9	 	        9.5
+// 3.5	 	        9.5	 
+// 4	    12	 	        10.0
+// 4.5	 	        10.5	 
+// 5	    9	 	        10.750
+// 5.5	 	        11.0	 
+// 6	    12	 	 
+// 6.5	 	 	 
+// 7	    11
+//
+// This is the final table:
+// Period	Value	Centered MA
+// 1	    9	 
+// 2	    8	 
+// 3	    9        9.5
+// 4	    12	    10.0
+// 5	    9   	10.75
+// 6	    12	 
+// 7	    11
+// 
+// With this script we are able to process and display the centered moving average as described above.
+// In addition to this, however, the script is also able to estimate the potential projection of future data based on the available data
+// by replicating where necessary the data of the last bar until the number of data necessary for the calculation of the required centered moving average is reached.
+//
+// If for example I have 20 daily closings and I look for the moving average centered at 10, I receive the first data on the fifth day
+// and the last data on the fourteenth day, so I have 5 days left uncovered, to remedy this I have to give the last value to the uncovered data 
+// the closing price of the last day.
+// The deviations work like the bollinger bands but must refer to the centered moving average.
+
+//@version=5
+
+// @description This indicator is a centered moving average!
+indicator("Centered Moving Average",max_lines_count = 500, overlay=true) 
+
+cma(float[] values,float[] mvalues,int length,int shift) =>
+    float sum = 0
+    size=0
+    end=array.size(values)-1
+    start=end-length+shift
+    for i=start to end
+        sum+=array.get(values,i)
+        size+=1
+    lastValue=array.get(values,end)
+    for i=shift-1 to 0
+        value=lastValue
+        if (not na(mvalues))
+            idx=array.size(mvalues)-i-2
+            value:=array.get(mvalues,idx)
+        sum+=value
+        size+=1
+    sum / size   
+
+plotall(data,dataGui,int xstart,float average,float dev)=>   
+    ly=average+dev
+    for i=0 to array.size(data)-1
+        y=array.get(data,i)+dev
+        array.push(dataGui,line.new(xstart+i,ly,xstart+i+1,y,width = 1,color=color.white))
+        ly:=y
+
+redesign(data,dataGui,int xstart,int offset,float average,float dev=0)=>
+    for g in dataGui
+        line.delete(g)
+    plotall(data,dataGui,xstart,average,0)
+    if (dev>0)
+        plotall(data,dataGui,xstart,average,dev)
+        plotall(data,dataGui,xstart,average,-1*dev)
+
+source = input.source(defval = high,title = 'source')
+length = input.int(defval = 10,title = 'length')
+future=input.bool(defval = true,title = 'show future')
+double=input.bool(defval = false,title = 'use double moving average')
+sdtDev = input.float(2.0, minval=0.001, maxval=50, title="StdDev")
+
+offset = math.ceil(length/2)
+average = ta.sma(source,length)
+
+var values=array.new_float(0)
+var data=array.new_float(0)
+var dataGui=array.new_line(0)
+
+if (array.size(values)>length+1)
+    array.remove(values,0)
+array.push(values,source[0])
+
+length_BC_Tminus1_MAX = length
+src_BC_Tminus1_MAX = source
+
+devMax = sdtDev * ta.stdev(src_BC_Tminus1_MAX, length_BC_Tminus1_MAX)
+upper = average + devMax
+lower = average - devMax
+plot(upper, "Upper", color=color.orange, offset = -offset)
+plot(lower, "Lower", color=color.orange, offset = -offset)
+
+if (barstate.islast)
+    // ridisegna le ultime barre
+    array.clear(data)
+    offsetEnd=(future?offset*2:offset)
+    for i=0 to offsetEnd
+        v=cma(values,na,length,i) 
+        array.push(data,v)   
+    if (double)
+        cdata=array.new_float(0)
+        array.insert(data,0,average) 
+        for i=0 to offsetEnd
+            v=cma(values,data,length,i)
+            array.push(cdata,v)   
+        data:=cdata
+    redesign(data,dataGui,bar_index-offset,offset,average,devMax)
+    
+// Plot SMA on the chart
+plot(series=average,offset = -offset, color=color.lime, linewidth=2)
